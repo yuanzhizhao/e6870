@@ -38,6 +38,64 @@ double ComputeDistance(const matrix<double>& mat_hyp,
   //
   //  Output:
   //      Set "dist" to the total distance between these two utterances.
+  //
+  //  P=1, r=100
+  int I = mat_hyp.size1();
+  int J = mat_templ.size1();
+  matrix<double> g;
+  g.resize(I+1, J+1);
+  g.clear();
+
+  // initial value
+  double N = I+J;
+  int r = 100;
+  int i=1, j=1;
+  g(0 ,0) = 0;
+  g(1, 1) = 2*EuclideanDistance(mat_hyp, 0, mat_templ, 0);
+
+  while(1){
+      i += 1;
+      if(i>j+r){
+          j += 1;
+          if(j > J){
+              dist = g(I, J) / N;
+              break;
+          }else{
+              i = j - r - 1;
+          }
+      }else if(i < 1 || i > I){
+          continue;
+      }else{
+          //cout << "i=" << i << ", j=" << j << endl;
+          double dist_i_j = EuclideanDistance(mat_hyp, i-1, mat_templ, j-1);
+          double dist_i_j1 = DBL_MAX;
+          double dist_i1_j = DBL_MAX;
+          if(j-2>0){
+            dist_i_j1 = EuclideanDistance(mat_hyp, i-1, mat_templ, j-2);
+          }
+          if(i-2>0){
+            dist_i1_j = EuclideanDistance(mat_hyp, i-2, mat_templ, j-1);
+          }
+          
+          // min1, min2, min3
+          double min1 = 0;
+          if(j-2 < 0){
+              min1 = 2*dist_i_j1 + dist_i_j;
+          }else{
+              min1 = g(i-1, j-2) + 2*dist_i_j1 + dist_i_j;
+          }
+          double min2 = g(i-1, j-1) + 2*dist_i_j;
+          double min3 = 0;
+          if(i-2<0){
+              min3 = 2*dist_i1_j + dist_i_j;
+          }else{
+              min3 = g(i-2, j-1) + 2*dist_i1_j + dist_i_j;
+          }
+
+          g(i, j) = min(min(min1, min2), min3);
+
+      }
+  }
 
   //  END_LAB
   return dist;
