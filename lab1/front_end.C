@@ -74,8 +74,20 @@ void FrontEnd::do_window(const matrix<double>& in_feats,
   // cout << format("in_samp_cnt %d\n") % in_samp_cnt;
   if (do_Hamming) {
     // Hamming windows
+    double PI = 3.1415926;
+    for(int i=0; i<out_frame_cnt; ++i){
+        for(int j=0; j<samp_per_window; ++j){
+            double window = 0.54 - 0.46*cos((2*PI*j)/(double)(samp_per_window-1));
+            out_feats(i, j) = window * in_feats(i*samp_shift+j, 0);
+        }
+    }
   } else {
     // Rectangular window
+    for(int i=0; i<out_frame_cnt; ++i){
+        for(int j=0; j<samp_per_window; ++j){
+            out_feats(i, j) = in_feats(i*samp_shift+j, 0);
+        }
+    }
   }
   //  END_LAB
 }
@@ -168,7 +180,49 @@ void FrontEnd::do_melbin(const matrix<double>& in_feats,
   // cout << format("input dim %d\n") % in_dim_cnt;
 
   // TODO: Optimize the compuatation order to avoid duplicate computation
+  
+  // r means rows
+  for(int i=0; i<in_frame_cnt; ++i){
+      for(int j=1; j<=out_dim_cnt; ++j){
+          double sum=0;
+          // for each frequency (Hz)
+          for(int k=0; k<in_dim_cnt/2; ++k){
+              // BEGIN X(f)
+              double f = k / (in_dim_cnt * sample_period);
+              double real = in_feats(i, 2*k);
+              double img = in_feats(i, 2*k+1);
 
+              double X_f = sqrt(real*real + img*img);
+              // END X(f)
+              
+              // BEGIN Hm[Mel_f]
+              double Mel_f = 1127 * log(1+f/700);
+              // double Mel_f_min = 0;
+              double Mel_f_max = 1127 * log(1 + 1/(700 * 2 * sample_period));
+              double Mel_f_m = j * Mel_f_max / (out_dim_cnt + 1);
+              double Mel_f_mp = (j-1) * Mel_f_max / (out_dim_cnt + 1);
+              double Mel_f_mn = (j+1) * Mel_f_max / (out_dim_cnt + 1);
+              double H;
+              if(Mel_f < Mel_f_mp || Mel_f > Mel_f_mn){
+                  H = 0;
+              }else if(Mel_f_mp <= Mel_f && Mel_f <= Mel_f_m){
+                  H = (Mel_f - Mel_f_mp) / (Mel_f_m - Mel_f_mp);
+              }else if(Mel_f_m <= Mel_f && Mel_f <= Mel_f_mn){
+                  H = (Mel_f_mn - Mel_f) / (Mel_f_mn - Mel_f_m);
+              }else{
+                  std::cout << "Invalid Mel_f" << std::endl;
+              }
+              // END Hm[Mel_f]
+              sum += X_f * H;
+          } // end of k
+          
+          if(do_log){
+              out_feats(i, j-1) = log(sum);
+          }else{
+              out_feats(i, j-1) = sum;
+          }
+      } // end of j
+  } // end of i
   //  END_LAB
 }
 
@@ -203,6 +257,17 @@ void FrontEnd::do_dct(const matrix<double>& in_feats,
   //
   //  See "in_frame_cnt", "in_dim_cnt", and "out_dim_cnt" above
   //  for quantities you will need for this computation.
+  double PI = 3.1415926;
+  for(int f=0; f<in_frame_cnt; ++f){
+      for(int j=0; j<out_dim_cnt; ++j){
+          double sum=0;
+          for(int i=0; i<in_dim_cnt; ++i){
+              sum += in_feats(f, i)* cos(PI*(j+1)*(i+0.5)/in_dim_cnt);
+          } // end of j
+          sum *= sqrt(2.0/in_dim_cnt);
+          out_feats(f, j) = sum;
+      } // end of k
+  } // end of f
   
   //  END_LAB
 }
